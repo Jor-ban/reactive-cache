@@ -1,18 +1,37 @@
 {
-  "name": "reactive-cache",
-  "private": true,
-  "version": "0.0.0",
+  "name": "@reactive-cache/core",
+  "version": "0.1.5",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "npx tsc && rm -f ./dist/test.js && npm publish"
   },
   "devDependencies": {
-    "typescript": "^5.5.3",
-    "vite": "^5.4.1"
+    "@reactive-cache/core": "^0.1.4",
+    "typescript": "^5.5.3"
   },
   "dependencies": {
+    "@angular/core": "^18.2.0",
     "rxjs": "^7.8.1"
-  }
+  },
+  "description": "reactive cache for angular and rxjs or signal projects",
+  "main": "dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jor-ban/reactive-cache.git"
+  },
+  "keywords": [
+    "angular",
+    "rxjs",
+    "signal",
+    "cache",
+    "state-manager",
+    "state"
+  ],
+  "author": "https://github.com/Jor-ban",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Jor-ban/reactive-cache/issues"
+  },
+  "homepage": "https://github.com/Jor-ban/reactive-cache#readme"
 }
