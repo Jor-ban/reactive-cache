@@ -1,10 +1,15 @@
 # Reactive Cache
 
+<a href="https://www.npmjs.com/package/@reactive-cache/core?activeTab=readme">
+    <img src="https://img.shields.io/badge/npm-CB3837?style=for-the-badge&logo=npm&logoColor=white" />
+</a>
+
 ## Installation
 
 ```bash
 npm install reactive-cache
 ```
+
 
 ## Usage
 
