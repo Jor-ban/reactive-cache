@@ -7,7 +7,7 @@
 //   console.log(value);
 // });
 
-import { reactiveCache } from '@reactive-cache/core';
+import { reactiveCache } from './index';
 import { ajax } from 'rxjs/ajax';
 import { Observable } from "rxjs";
 
@@ -18,3 +18,6 @@ export class FetchDataService {
     return ajax.get('https://jsonplaceholder.typicode.com/posts');
   }
 }
+
+const service = new FetchDataService();
+service.data.subscribe(console.log)

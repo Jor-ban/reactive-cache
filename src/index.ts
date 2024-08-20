@@ -35,9 +35,10 @@ export const __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__ = new BehaviorSubject<vo
 export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheParams>(updateObservable: Observable<T>, params?: ReactiveCacheParams): ReactiveCacheReturnType<T, PT>;
 export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheParams>(updateFunction: (...args: unknown[]) => T | Observable<T>, params?: ReactiveCacheParams): ReactiveCacheReturnType<T, PT>;
 export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheParams>(updateSignal: Signal<T>, params?: ReactiveCacheParams): ReactiveCacheReturnType<T, PT>;
-export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheParams>(updateSignal: Promise<T>, params?: ReactiveCacheParams): ReactiveCacheReturnType<T, PT>;
+export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheParams>(updatePromise: Promise<T>, params?: ReactiveCacheParams): ReactiveCacheReturnType<T, PT>;
+export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheParams>(valueItself: T, params?: ReactiveCacheParams): ReactiveCacheReturnType<T, PT>;
 export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheParams>(
-  updateRecourse$: Observable<T> | ((...args: unknown[]) => T | Observable<T>) | Signal<T> | Promise<T>,
+  updateRecourse$: Observable<T> | ((...args: unknown[]) => T | Observable<T>) | Signal<T> | Promise<T> | T,
   params?: PT,
 ): ReactiveCacheReturnType<T, PT> {
   const name = params?.name || '[UNNAMED] '  + new Error().stack?.split("\n")[4].trim().split(" ")[1];
@@ -47,6 +48,10 @@ export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheP
 
   __REACTIVE_CACHES_LIST__.push(_state$);
   __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__.next();
+
+  const nonEmptyStateRef$ = _state$.pipe(
+    filter((value: T | typeof EMPTY_SYMBOL) => value !== EMPTY_SYMBOL)
+  ) as Observable<T>;
 
   if(params?.allowManualUpdate === false) {
     return Object.assign(getObservable(), {
@@ -115,19 +120,23 @@ export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheP
       _updateProceeding = true;
 
       return requestUpdateFromObservable(from(updateRecourse$))
-    } else {
+    } else if (updateRecourse$ instanceof Function) {
       _updateProceeding = true;
       const result = updateRecourse$();
 
-      if (result instanceof Observable) {
+      if (result instanceof Promise) {
+        return requestUpdateFromObservable(from(result));
+      } else if (result instanceof Observable) {
         return requestUpdateFromObservable(result);
       }
 
       _state$.next(result);
 
-      return _state$.pipe(
-        filter((value: T | typeof EMPTY_SYMBOL) => value !== EMPTY_SYMBOL)
-      ) as Observable<T>;
+      return nonEmptyStateRef$;
+    } else {
+      _state$.next(updateRecourse$);
+
+      return nonEmptyStateRef$;
     }
   }
 
@@ -140,9 +149,7 @@ export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheP
         _state$.next(value);
         _updateProceeding = false;
 
-        return _state$.pipe(
-          filter((value: T | typeof EMPTY_SYMBOL) => value !== EMPTY_SYMBOL)
-        ) as Observable<T>;
+        return nonEmptyStateRef$;
       })
     );
   }

@@ -1,10 +1,10 @@
 {
   "name": "@reactive-cache/core",
-  "version": "0.1.5",
+  "version": "0.1.8",
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "deploy": "npx tsc && rm -f ./dist/test.js && npm publish"
+    "prepare": "npx tsc && node ./dist/test.js && rm -f ./dist/test.js"
   },
   "devDependencies": {
     "@reactive-cache/core": "^0.1.4",

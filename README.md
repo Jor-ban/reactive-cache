@@ -7,7 +7,7 @@
 ## Installation
 
 ```bash
-npm install reactive-cache
+$ npm install @reactive-cache/core
 ```
 
 
