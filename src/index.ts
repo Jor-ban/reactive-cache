@@ -1,7 +1,7 @@
 import { isSignal, Signal } from "@angular/core";
 import { toObservable, toSignal } from "@angular/core/rxjs-interop";
 
-import {BehaviorSubject, exhaustMap, filter, from, Observable, tap} from "rxjs";
+import { BehaviorSubject, exhaustMap, filter, from, Observable, switchMap, tap } from "rxjs";
 
 import { NamedBehaviorSubject } from "./named-behavior-subject";
 
@@ -143,14 +143,15 @@ export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheP
   function requestUpdateFromObservable(updateRecourse: Observable<T>): Observable<T> {
     return updateRecourse.pipe(
       tap({
-        error: () => _updateProceeding = false,
+        next: (value) => {
+          _state$.next(value);
+          _updateProceeding = false;
+        },
+        error: () => {
+          _updateProceeding = false
+        },
       }),
-      exhaustMap((value) => {
-        _state$.next(value);
-        _updateProceeding = false;
-
-        return nonEmptyStateRef$;
-      })
+      switchMap(() => nonEmptyStateRef$)
     );
   }
 }
