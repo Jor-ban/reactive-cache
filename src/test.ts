@@ -12,7 +12,7 @@ import { ajax } from 'rxjs/ajax';
 import { Observable } from "rxjs";
 
 export class FetchDataService {
-  public data = reactiveCache<unknown>(this.fetchData.bind(this));
+  public data = reactiveCache<unknown>(this.fetchData.bind(this), { name: 'response', valueReachable: true });
 
   private fetchData(): Observable<unknown> {
     return ajax.get('https://jsonplaceholder.typicode.com/posts');
@@ -21,3 +21,6 @@ export class FetchDataService {
 
 const service = new FetchDataService();
 service.data.subscribe(console.log)
+
+service.data.next('')
+service.data.getValue()

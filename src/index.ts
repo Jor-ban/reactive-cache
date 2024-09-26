@@ -1,6 +1,3 @@
-import { isSignal, Signal } from "@angular/core";
-import { toObservable, toSignal } from "@angular/core/rxjs-interop";
-
 import { BehaviorSubject, exhaustMap, filter, from, Observable, switchMap, tap } from "rxjs";
 
 import { NamedBehaviorSubject } from "./named-behavior-subject";
@@ -8,39 +5,50 @@ import { NamedBehaviorSubject } from "./named-behavior-subject";
 export const EMPTY_SYMBOL = Symbol("[UPDATABLE CACHE] EMPTY"); // this symbol is needed, coz state can be null | undefined
 
 export interface ReactiveCacheObservable<T> extends Observable<T> {
-  getObservable: () => Observable<T>;
-  getSignal: (initialValue: T) => Signal<T>;
-  manualUpdateState: (newState: T) => void;
-  resetState: () => void;
-  update: () => Observable<T>;
-  complete: () => void;
+  getObservable: () => Observable<T>
+  next: (newState: T) => void
+  resetState: () => void
+  update: () => Observable<T>
+  complete: () => void
+}
+
+export interface ValueReachableObservable<T> extends ReactiveCacheObservable<T> {
+  getValue: () => T
+}
+
+export interface ValueReachableImmutableObservable<T> extends ImmutableReactiveCacheObservable<T> {
+  getValue: () => T
 }
 
 export interface ImmutableReactiveCacheObservable<T> extends Observable<T> {
-  getObservable: () => Observable<T>;
-  getSignal: (initialValue: T) => Signal<T>;
-  update: () => Observable<T>;
-  complete: () => void;
+  getObservable: () => Observable<T>
+  update: () => Observable<T>
+  complete: () => void
 }
-export interface ReactiveCacheParams {
-  name?: string;
-  allowManualUpdate?: boolean;
-}
-
-type ReactiveCacheReturnType<T, PT extends ReactiveCacheParams> = PT extends { allowManualUpdate: false } ? ImmutableReactiveCacheObservable<T> : ReactiveCacheObservable<T>;
 
 export const __REACTIVE_CACHES_LIST__: NamedBehaviorSubject<any>[] = [];
 export const __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__ = new BehaviorSubject<void>(undefined)
 
-export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheParams>(updateObservable: Observable<T>, params?: ReactiveCacheParams): ReactiveCacheReturnType<T, PT>;
-export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheParams>(updateFunction: (...args: unknown[]) => T | Observable<T>, params?: ReactiveCacheParams): ReactiveCacheReturnType<T, PT>;
-export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheParams>(updateSignal: Signal<T>, params?: ReactiveCacheParams): ReactiveCacheReturnType<T, PT>;
-export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheParams>(updatePromise: Promise<T>, params?: ReactiveCacheParams): ReactiveCacheReturnType<T, PT>;
-export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheParams>(valueItself: T, params?: ReactiveCacheParams): ReactiveCacheReturnType<T, PT>;
-export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheParams>(
-  updateRecourse$: Observable<T> | ((...args: unknown[]) => T | Observable<T>) | Signal<T> | Promise<T> | T,
-  params?: PT,
-): ReactiveCacheReturnType<T, PT> {
+export function reactiveCache<T>(
+  updateRecourse$: Observable<T> | ((...args: unknown[]) => T | Observable<T>) | Promise<T> | T,
+  params: { allowManualUpdate: false; valueReachable: true; name?: string }
+): ValueReachableImmutableObservable<T>;
+export function reactiveCache<T>(
+  updateRecourse$: Observable<T> | ((...args: unknown[]) => T | Observable<T>) | Promise<T> | T,
+  params: { allowManualUpdate: false; name?: string }
+): ImmutableReactiveCacheObservable<T>;
+export function reactiveCache<T>(
+  updateRecourse$: Observable<T> | ((...args: unknown[]) => T | Observable<T>) | Promise<T> | T,
+  params: { valueReachable: true; name?: string }
+): ValueReachableObservable<T>;
+export function reactiveCache<T>(
+  updateRecourse$: Observable<T> | ((...args: unknown[]) => T | Observable<T>) | Promise<T> | T,
+  params?: { name?: string }
+): ReactiveCacheObservable<T>;
+export function reactiveCache<T>(
+  updateRecourse$: Observable<T> | ((...args: unknown[]) => T | Observable<T>) | Promise<T> | T,
+  params?: { allowManualUpdate ?: boolean; valueReachable ?: boolean; name?: string },
+): ReactiveCacheObservable<T> | ValueReachableObservable<T> | ImmutableReactiveCacheObservable<T> | ValueReachableImmutableObservable<T> {
   const name = params?.name || '[UNNAMED] '  + new Error().stack?.split("\n")[4].trim().split(" ")[1];
   const _state$ = new NamedBehaviorSubject<T | typeof EMPTY_SYMBOL>(EMPTY_SYMBOL, name);
 
@@ -54,22 +62,40 @@ export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheP
   ) as Observable<T>;
 
   if(params?.allowManualUpdate === false) {
-    return Object.assign(getObservable(), {
-      getObservable,
-      getSignal,
-      update,
-      complete,
-    }) as ReactiveCacheObservable<T>;
+    if(params?.valueReachable) {
+      return Object.assign(getObservable(), {
+        getObservable,
+        update,
+        complete,
+        getValue: () => _state$.getValue(),
+      });
+    } else {
+      return Object.assign(getObservable(), {
+        getObservable,
+        update,
+        complete,
+      });
+    }
   }
 
-  return Object.assign(getObservable(), {
-    getObservable,
-    getSignal,
-    manualUpdateState,
-    resetState,
-    update,
-    complete,
-  }) as ReactiveCacheObservable<T>;
+  if(params?.valueReachable) {
+    return Object.assign(getObservable(), {
+      getObservable,
+      next,
+      resetState,
+      update,
+      complete,
+      getValue: () => _state$.getValue(),
+    });
+  } else {
+    return Object.assign(getObservable(), {
+      getObservable,
+      next,
+      resetState,
+      update,
+      complete,
+    });
+  }
 
   function getObservable(): Observable<T> {
     return _state$.pipe(
@@ -83,17 +109,13 @@ export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheP
     );
   }
 
-  function getSignal(initialValue: T): Signal<T> {
-    return toSignal(getObservable(), { initialValue });
-  }
-
   /**
    *
    * @note: not recommended to use this method.
    * @param newState
    * @description Use this method to update state manually.
    */
-  function manualUpdateState(newState: T): void {
+  function next(newState: T): void {
     _state$.next(newState);
   }
 
@@ -112,10 +134,6 @@ export function reactiveCache<T, PT extends ReactiveCacheParams = ReactiveCacheP
       _updateProceeding = true;
 
       return requestUpdateFromObservable(updateRecourse$);
-    } else if(isSignal(updateRecourse$)) {
-      _updateProceeding = true;
-
-      return toObservable(updateRecourse$ as Signal<T>)
     } else if(updateRecourse$ instanceof Promise) {
       _updateProceeding = true;
 
