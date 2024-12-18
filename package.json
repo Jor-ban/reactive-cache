@@ -1,13 +1,16 @@
 {
   "name": "@reactive-cache/core",
-  "version": "0.3.0",
+  "version": "2.3.0",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "npx tsc && tsx watch src/test.ts && echo 'all tests are complete!'",
     "prepare": "npx tsc && rm -f ./dist/test.js"
   },
   "devDependencies": {
     "@reactive-cache/core": "^0.1.4",
+    "axios": "^1.7.9",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.2",
     "typescript": "^5.5.3"
   },
   "dependencies": {

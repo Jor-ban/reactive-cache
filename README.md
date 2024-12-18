@@ -29,7 +29,7 @@ import { ajax } from 'rxjs/ajax';
 import { Observable } from "rxjs";
 
 export class FetchDataService {
-  public data = reactiveCache<unknown>(this.fetchData.bind(this), { name: 'response', valueReachable: true });
+  public readonly response$ = reactiveCache.valueReadable<unknown>('response$', () => this.fetchData());
 
   private fetchData(): Observable<unknown> {
     return ajax.get('https://jsonplaceholder.typicode.com/posts');
