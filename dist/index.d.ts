@@ -3,10 +3,10 @@ import { BehaviorSubject, Observable } from "rxjs";
 import { NamedBehaviorSubject } from "./named-behavior-subject";
 import {ConstantReactiveCacheObservable} from "../src";
 
-export interface ReactiveCacheObservableParameters {
+export interface ReactiveCacheObservableParameters<T> {
   allowManualUpdate?: boolean
   valueReachable?: boolean
-  minTeardownTimeMs?: number
+  onNext?: (v: T | typeof EMPTY_SYMBOL) => void
 }
 
 export interface ReactiveCacheObservable<T> extends Observable<T> {
@@ -19,7 +19,7 @@ export interface ReactiveCacheObservable<T> extends Observable<T> {
 }
 
 export interface ValueReachableObservable<T> extends ReactiveCacheObservable<T> {
-  getValue: () => T | null
+  getValue: () => T
   isReactiveCacheObservable: true
 }
 
@@ -36,19 +36,21 @@ export interface ConstantReactiveCacheObservable<T> extends Observable<Readonly<
 
 export type UpdateRecourseType<T> = Observable<T> | ((...args: unknown[]) => T | Observable<T>) | Promise<T> | T
 
+export const __REACTIVE_CACHE_WINDOW_PROP_NAME__ = '__REACTIVE_CACHE_DATA__'
 export const __REACTIVE_CACHES_LIST__: NamedBehaviorSubject<any>[]
+export const __REACTIVE_CACHES_ON_UPDATE_MAP__ = new WeakMap<NamedBehaviorSubject<any>, BehaviorSubject<any>>()
 export const __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__: BehaviorSubject<void>
 export const EMPTY_SYMBOL: Symbol // this symbol is needed, coz state can be null | undefined as value
 
 /**
  * Creates a reactive cache with a name in debugger
  */
-export function reactiveCache<T>(name: string, updateRecourse$: UpdateRecourseType<T>, params?: ReactiveCacheObservableParameters): ReactiveCacheObservable<T> {}
+export function reactiveCache<T>(name: string, updateRecourse$: UpdateRecourseType<T>, params?: ReactiveCacheObservableParameters<T>): ReactiveCacheObservable<T> {}
 
 /**
  * Creates a reactiveCache that does not allow next() method
  */
-reactiveCache.readonly = function<T>(name: string, updateRecourse$: UpdateRecourseType<T>, params?: Omit<ReactiveCacheObservableParameters, 'allowManualUpdate'>): ImmutableReactiveCacheObservable<T> {};
+reactiveCache.readonly = function<T>(name: string, updateRecourse$: UpdateRecourseType<T>, params?: Omit<ReactiveCacheObservableParameters<T>, 'allowManualUpdate'>): ImmutableReactiveCacheObservable<T> {};
 /**
  * Allows to read value in observable using getValue() method
  *
@@ -59,20 +61,21 @@ reactiveCache.valueReadable = function<T>(
   name: string,
   updateRecourse$: UpdateRecourseType<T>,
   defaultValue?: T,
-  params?: Omit<ReactiveCacheObservableParameters, 'valueReachable'>
+  params?: Omit<ReactiveCacheObservableParameters<T>, 'valueReachable'>
 ): ValueReachableObservable<T> {};
 
 /**
  * Creates a reactive cache with anonymous name in debugger
  */
-reactiveCache.anonymous = function<T>(updateRecourse$: UpdateRecourseType<T>, params?: ReactiveCacheObservableParameters): ReactiveCacheObservable<T> {};
+reactiveCache.anonymous = function<T>(updateRecourse$: UpdateRecourseType<T>, params?: ReactiveCacheObservableParameters<T>): ReactiveCacheObservable<T> {};
 
 reactiveCache.constant = function <T>(name: string, updateRecourse$: UpdateRecourseType<T>): ConstantReactiveCacheObservable<T> {}
 
 export function __createReactiveCache__<T>(
   updateRecourse$: UpdateRecourseType<T>,
   params?: ReactiveCacheObservableParameters<T> & { name?: string, constant?: boolean, defaultValue?: T },
-  onComplete?: () => void
+  onData?: (v: T | typeof EMPTY_SYMBOL) => void,
+  onComplete?: () => void,
 ): {
   name: string,
   state$: NamedBehaviorSubject<T | typeof EMPTY_SYMBOL>,

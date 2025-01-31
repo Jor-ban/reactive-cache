@@ -14,11 +14,11 @@ export interface ReactiveCacheObservable<T> extends Observable<T> {
 export interface ReactiveCacheObservableParameters<T> {
   allowManualUpdate?: boolean
   valueReachable?: boolean
-  onNext?: (v: T) => void
+  onNext?: (v: T | typeof EMPTY_SYMBOL) => void
 }
 
 export interface ValueReachableObservable<T> extends ReactiveCacheObservable<T> {
-  getValue: () => T | null
+  getValue: () => T
   isReactiveCacheObservable: true
 }
 
@@ -36,7 +36,9 @@ export interface ImmutableReactiveCacheObservable<T> extends Observable<Readonly
 
 export type UpdateRecourseType<T> = Observable<T> | ((...args: unknown[]) => T | Observable<T> | Promise<T>) | Promise<T> | T
 
+export const __REACTIVE_CACHE_WINDOW_PROP_NAME__ = '__REACTIVE_CACHE_DATA__'
 export const __REACTIVE_CACHES_LIST__: NamedBehaviorSubject<any>[] = [];
+export const __REACTIVE_CACHES_ON_UPDATE_MAP__ = new WeakMap<NamedBehaviorSubject<any>, BehaviorSubject<any>>()
 export const __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__ = new BehaviorSubject<void>(undefined)
 export const EMPTY_SYMBOL = Symbol("[UPDATABLE CACHE] EMPTY"); // this symbol is needed, coz state can be null | undefined as value
 let WINDOW
@@ -45,15 +47,17 @@ try {
 } catch (_ignored) {}
 
 if(WINDOW && typeof WINDOW === 'object') {
-  const propName = '__REACTIVE_CACHE_DATA__'
   // @ts-ignore
-  WINDOW[propName] = {}
+  if(!WINDOW[__REACTIVE_CACHE_WINDOW_PROP_NAME__]) {
+    // @ts-ignore
+    WINDOW[__REACTIVE_CACHE_WINDOW_PROP_NAME__] = {}
+  }
   // @ts-ignore
-  WINDOW[propName]['__REACTIVE_CACHES_LIST__'] = __REACTIVE_CACHES_LIST__;
+  WINDOW[__REACTIVE_CACHE_WINDOW_PROP_NAME__]['__REACTIVE_CACHES_LIST__'] = __REACTIVE_CACHES_LIST__;
   // @ts-ignore
-  WINDOW[propName]['__REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__'] = __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__;
+  WINDOW[__REACTIVE_CACHE_WINDOW_PROP_NAME__]['__REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__'] = __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__;
   // @ts-ignore
-  WINDOW[propName]['EMPTY_SYMBOL'] = EMPTY_SYMBOL;
+  WINDOW[__REACTIVE_CACHE_WINDOW_PROP_NAME__]['EMPTY_SYMBOL'] = EMPTY_SYMBOL;
 }
 
 export function reactiveCache<T>(name: string, updateRecourse$: UpdateRecourseType<T>, params?: ReactiveCacheObservableParameters<T>): ReactiveCacheObservable<T> {
@@ -92,13 +96,26 @@ reactiveCache.constant = function <T>(
 }
 
 function createRCWithTracking<T>(updateRecourse$: UpdateRecourseType<T>, params ?: ReactiveCacheObservableParameters<T> & { name?: string, constant?: boolean, defaultValue?: T }): Observable<T> {
-  const { rc, state$ } = __createReactiveCache__<T>(updateRecourse$, params, () => {
-    const index = __REACTIVE_CACHES_LIST__.indexOf(state$);
-    if(index !== -1) {
-      __REACTIVE_CACHES_LIST__.splice(index, 1);
+  const { rc, state$ } = __createReactiveCache__<T>(
+    updateRecourse$,
+    params,
+    (data) => {
+      if(!__REACTIVE_CACHES_ON_UPDATE_MAP__.has(state$)) {
+        __REACTIVE_CACHES_ON_UPDATE_MAP__.set(state$, new BehaviorSubject<T | typeof EMPTY_SYMBOL>(EMPTY_SYMBOL));
+      }
+      __REACTIVE_CACHES_ON_UPDATE_MAP__.get(state$)?.next(data);
+    },
+    () => {
+      const index = __REACTIVE_CACHES_LIST__.indexOf(state$);
+      if(index !== -1) {
+        __REACTIVE_CACHES_LIST__.splice(index, 1);
+      }
+      __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__.next();
     }
-    __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__.next();
-  });
+  );
+  if(!__REACTIVE_CACHES_ON_UPDATE_MAP__.has(state$)) {
+    __REACTIVE_CACHES_ON_UPDATE_MAP__.set(state$, new BehaviorSubject<T | typeof EMPTY_SYMBOL>(EMPTY_SYMBOL));
+  }
   __REACTIVE_CACHES_LIST__.push(state$);
   __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__.next();
 
@@ -108,7 +125,8 @@ function createRCWithTracking<T>(updateRecourse$: UpdateRecourseType<T>, params 
 export function __createReactiveCache__<T>(
   updateRecourse$: UpdateRecourseType<T>,
   params?: ReactiveCacheObservableParameters<T> & { name?: string, constant?: boolean, defaultValue?: T },
-  onComplete?: () => void
+  onData?: (v: T | typeof EMPTY_SYMBOL) => void,
+  onComplete?: () => void,
 ): {
   name: string,
   state$: NamedBehaviorSubject<T | typeof EMPTY_SYMBOL>,
@@ -229,10 +247,13 @@ export function __createReactiveCache__<T>(
   function next(newState: T): void {
     state$.next(newState);
     params?.onNext?.(newState);
+    onData?.(newState);
   }
 
   function resetState(): void {
     state$.next(EMPTY_SYMBOL);
+    params?.onNext?.(EMPTY_SYMBOL);
+    onData?.(EMPTY_SYMBOL);
   }
 
   function complete(): void {
@@ -260,21 +281,23 @@ export function __createReactiveCache__<T>(
       }
 
       state$.next(result);
+      onData?.(result);
 
       return nonEmptyStateRef$;
     } else {
       state$.next(updateRecourse$);
+      onData?.(updateRecourse$);
 
       return nonEmptyStateRef$;
     }
   }
 
-  function getValue(): T | null {
+  function getValue(): T {
     if(state$.getValue() !== EMPTY_SYMBOL) {
       return state$.getValue() as T
     }
-
-    return params?.defaultValue ?? null;
+    // default value is required in this case
+    return params?.defaultValue as T
   }
 
   function requestUpdateFromObservable(updateRecourse: Observable<T>): Observable<T> {
