@@ -1,9 +1,10 @@
 {
   "name": "@reactive-cache/core",
-  "version": "2.6.0",
+  "version": "3.0.0",
   "type": "module",
   "scripts": {
     "test": "npx tsc && tsx watch src/test.ts && echo 'all tests are complete!'",
+    "manual-test": "npx tsc && tsx watch src/manualTest.ts",
     "prepare": "npx tsc && rm -f ./dist/test.js"
   },
   "devDependencies": {

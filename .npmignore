@@ -1,2 +1,11 @@
 test
 node_modules
+src/**/*.test.ts
+src/**/*.spec.ts
+src/**/*.test.tsx
+src/*.test.ts
+src/*.spec.ts
+src/*.test.tsx
+src/manualTest.ts
+dist/test.js
+dist/manualTest.js

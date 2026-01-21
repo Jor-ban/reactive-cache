@@ -1,5 +1,4 @@
 import {BehaviorSubject, defer, exhaustMap, filter, from, Observable, Subscription, switchMap, tap} from "rxjs";
-
 import {NamedBehaviorSubject} from "./named-behavior-subject";
 
 export interface ReactiveCacheObservable<T> extends Observable<T> {
@@ -11,10 +10,11 @@ export interface ReactiveCacheObservable<T> extends Observable<T> {
   isReactiveCacheObservable: true
 }
 
-export interface ReactiveCacheObservableParameters<T> {
+export interface ReactiveCacheObservableParameters<T, Nil = typeof EMPTY_SYMBOL> {
   allowManualUpdate?: boolean
   valueReachable?: boolean
-  onNext?: (v: T | typeof EMPTY_SYMBOL) => void
+  nil?: Nil
+  onNext?: (v: T | Nil) => void
 }
 
 export interface ValueReachableObservable<T> extends ReactiveCacheObservable<T> {
@@ -41,7 +41,7 @@ export const __REACTIVE_CACHES_LIST__: NamedBehaviorSubject<any>[] = [];
 export const __REACTIVE_CACHES_ON_UPDATE_MAP__ = new WeakMap<NamedBehaviorSubject<any>, BehaviorSubject<any>>()
 export const __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__ = new BehaviorSubject<void>(undefined)
 export const EMPTY_SYMBOL = Symbol("[UPDATABLE CACHE] EMPTY"); // this symbol is needed, coz state can be null | undefined as value
-let WINDOW
+let WINDOW: Window | null = null
 try {
   WINDOW = window || this
 } catch (_ignored) {}
@@ -60,48 +60,48 @@ if(WINDOW && typeof WINDOW === 'object') {
   WINDOW[__REACTIVE_CACHE_WINDOW_PROP_NAME__]['EMPTY_SYMBOL'] = EMPTY_SYMBOL;
 }
 
-export function reactiveCache<T>(name: string, updateRecourse$: UpdateRecourseType<T>, params?: ReactiveCacheObservableParameters<T>): ReactiveCacheObservable<T> {
+export const reactiveCache = <T>(name: string, updateRecourse$: UpdateRecourseType<T>, params?: ReactiveCacheObservableParameters<T>): ReactiveCacheObservable<T> => {
   return createRCWithTracking(updateRecourse$, { name, ...params }) as ReactiveCacheObservable<T>;
 }
 
-reactiveCache.readonly = function <T>(
+reactiveCache.readonly = <T>(
   name: string,
   updateRecourse$: UpdateRecourseType<T>,
   params?: Omit<ReactiveCacheObservableParameters<T>, 'allowManualUpdate'>
-): ImmutableReactiveCacheObservable<T> {
+): ImmutableReactiveCacheObservable<T> => {
   return createRCWithTracking(updateRecourse$, { name, allowManualUpdate: false, ...params }) as ImmutableReactiveCacheObservable<T>
 };
 
-reactiveCache.valueReadable = function <T>(
+reactiveCache.valueReadable = <T>(
   name: string,
   updateRecourse$: UpdateRecourseType<T>,
   defaultValue?: T,
   params?: Omit<ReactiveCacheObservableParameters<T>, 'valueReachable'>
-): ValueReachableObservable<T> {
+): ValueReachableObservable<T> => {
   return createRCWithTracking(updateRecourse$, { name, defaultValue, valueReachable: true, ...params }) as ValueReachableObservable<T>
 };
 
-reactiveCache.anonymous = function <T>(
+reactiveCache.anonymous = <T>(
   updateRecourse$: UpdateRecourseType<T>,
   params?: ReactiveCacheObservableParameters<T>
-): ReactiveCacheObservable<T> {
+): ReactiveCacheObservable<T> => {
   return createRCWithTracking(updateRecourse$, params) as ReactiveCacheObservable<T>;
 };
 
-reactiveCache.constant = function <T>(
+reactiveCache.constant = <T>(
   name: string,
   updateRecourse$: UpdateRecourseType<T>,
-): ConstantReactiveCacheObservable<T> {
+): ConstantReactiveCacheObservable<T> => {
   return createRCWithTracking(updateRecourse$, { name, constant: true }) as ConstantReactiveCacheObservable<T>;
 }
 
-function createRCWithTracking<T>(updateRecourse$: UpdateRecourseType<T>, params ?: ReactiveCacheObservableParameters<T> & { name?: string, constant?: boolean, defaultValue?: T }): Observable<T> {
-  const { rc, state$ } = __createReactiveCache__<T>(
+const createRCWithTracking = <T, Nil>(updateRecourse$: UpdateRecourseType<T>, params ?: ReactiveCacheObservableParameters<T, Nil> & { name?: string, constant?: boolean, defaultValue?: T }): Observable<T> => {
+  const { rc, state$, nil } = __createReactiveCache__<T, Nil>(
     updateRecourse$,
     params,
     (data) => {
       if(!__REACTIVE_CACHES_ON_UPDATE_MAP__.has(state$)) {
-        __REACTIVE_CACHES_ON_UPDATE_MAP__.set(state$, new BehaviorSubject<T | typeof EMPTY_SYMBOL>(EMPTY_SYMBOL));
+        __REACTIVE_CACHES_ON_UPDATE_MAP__.set(state$, new BehaviorSubject<T | Nil>(nil));
       }
       __REACTIVE_CACHES_ON_UPDATE_MAP__.get(state$)?.next(data);
     },
@@ -114,7 +114,7 @@ function createRCWithTracking<T>(updateRecourse$: UpdateRecourseType<T>, params 
     }
   );
   if(!__REACTIVE_CACHES_ON_UPDATE_MAP__.has(state$)) {
-    __REACTIVE_CACHES_ON_UPDATE_MAP__.set(state$, new BehaviorSubject<T | typeof EMPTY_SYMBOL>(EMPTY_SYMBOL));
+    __REACTIVE_CACHES_ON_UPDATE_MAP__.set(state$, new BehaviorSubject<T | Nil>(nil));
   }
   __REACTIVE_CACHES_LIST__.push(state$);
   __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__.next();
@@ -122,118 +122,67 @@ function createRCWithTracking<T>(updateRecourse$: UpdateRecourseType<T>, params 
   return rc
 }
 
-export function __createReactiveCache__<T>(
+export const __createReactiveCache__ = <T, Nil = typeof EMPTY_SYMBOL>(
   updateRecourse$: UpdateRecourseType<T>,
-  params?: ReactiveCacheObservableParameters<T> & { name?: string, constant?: boolean, defaultValue?: T },
-  onData?: (v: T | typeof EMPTY_SYMBOL) => void,
+  params?: ReactiveCacheObservableParameters<T, Nil> & { name?: string, constant?: boolean, defaultValue?: T },
+  onData?: (v: T | Nil) => void,
   onComplete?: () => void,
 ): {
   name: string,
-  state$: NamedBehaviorSubject<T | typeof EMPTY_SYMBOL>,
+  state$: NamedBehaviorSubject<T | Nil>,
+  nil: Nil,
   rc: ReactiveCacheObservable<T> | ValueReachableObservable<T> | ImmutableReactiveCacheObservable<T> | ConstantReactiveCacheObservable<T>
-} {
+} => {
   let name = params?.name ?? '[UNNAMED]';
-  const state$ = new NamedBehaviorSubject<T | typeof EMPTY_SYMBOL>(EMPTY_SYMBOL, name);
+  let patchedState: T | null = null
+  let nil = (params && 'nil' in params ? params.nil : EMPTY_SYMBOL) as Nil;
+  const state$ = new NamedBehaviorSubject<T | Nil>(nil as Nil, name);
   const isReactiveCacheObservable: true = true;
+
+  if(params) {
+    params.onNext = params.onNext || (() => {
+      patchState()
+    })
+  } else {
+    params = {
+      onNext: () => {
+        patchState()
+      }
+    }
+  }
 
   let _updateProceeding = false;
 
   const nonEmptyStateRef$ = state$.pipe(
-    filter((value: T | typeof EMPTY_SYMBOL) => value !== EMPTY_SYMBOL)
+    filter((value: T | Nil): value is T | Nil => value !== nil)
   ) as Observable<T>;
 
-  if(params?.constant) {
-    return {
-      name, state$,
-      rc: Object.assign(getConstantObservable(), {
-        getObservable: getConstantObservable,
-        isReactiveCacheObservable,
-      })
-    }
-  }
-
-  if(params?.allowManualUpdate === false) {
-    if(params?.valueReachable) {
-      return {
-        name, state$,
-        rc: Object.assign(getObservable(), {
-          getObservable,
-          update,
-          complete,
-          resetState,
-          getValue,
-          isReactiveCacheObservable,
-        })
-      }
-    } else {
-      return {
-        name, state$,
-        rc: Object.assign(getObservable(), {
-          getObservable,
-          update,
-          complete,
-          resetState,
-          isReactiveCacheObservable,
-        })
-      }
-    }
-  }
-
-  if(params?.valueReachable) {
-    return {
-      name, state$,
-      rc: Object.assign(getObservable(), {
-        getObservable,
-        next,
-        resetState,
-        update,
-        complete,
-        getValue,
-        isReactiveCacheObservable,
-      })
-    };
-  } else {
-    return {
-      name, state$,
-      rc: Object.assign(getObservable(), {
-        getObservable,
-        next,
-        resetState,
-        update,
-        complete,
-        isReactiveCacheObservable,
-      })
-    }
-  }
-
-  function getObservable(): Observable<T> {
-    return state$.pipe(
-      exhaustMap((value: T | typeof EMPTY_SYMBOL): Observable<T> => {
-        if (_updateProceeding || value !== EMPTY_SYMBOL) {
-          return state$.pipe(filter(v => v !== EMPTY_SYMBOL)) as Observable<T>;
+  const getObservable = (): Observable<T> => state$.pipe(
+      exhaustMap((value: T | Nil): Observable<T> => {
+        if (_updateProceeding || value !== nil) {
+          return state$.pipe(filter(v => v !== nil)) as Observable<T>;
         } else {
           return update();
         }
       })
-    )
-  }
+  )
 
-  function getConstantObservable(): Observable<T> {
+  const getConstantObservable = (): Observable<T> => {
     const obs = getObservable()
     let subscription: Subscription | undefined
 
     return defer(() => {
-      if (!subscription && state$.value === EMPTY_SYMBOL) {
+      if (!subscription && state$.value === nil) {
         subscription = obs.subscribe()
       }
 
       return obs.pipe(
-        tap({
-          next: () => {
-            subscription?.unsubscribe();
-            subscription = undefined;
-          }
-        })
+          tap({
+            next: () => {
+              subscription?.unsubscribe();
+              subscription = undefined;
+            }
+          })
       )
     })
   }
@@ -244,24 +193,24 @@ export function __createReactiveCache__<T>(
    * @param newState
    * @description Use this method to update state manually.
    */
-  function next(newState: T): void {
+  const next = (newState: T): void => {
     state$.next(newState);
     params?.onNext?.(newState);
     onData?.(newState);
   }
 
-  function resetState(): void {
-    state$.next(EMPTY_SYMBOL);
-    params?.onNext?.(EMPTY_SYMBOL);
-    onData?.(EMPTY_SYMBOL);
+  const resetState = (): void => {
+    state$.next(nil);
+    params?.onNext?.(nil);
+    onData?.(nil);
   }
 
-  function complete(): void {
+  const complete = (): void => {
     onComplete?.();
     state$.complete();
   }
 
-  function update(): Observable<T> {
+  const update = (): Observable<T> => {
     if (updateRecourse$ instanceof Observable) {
       _updateProceeding = true;
 
@@ -292,7 +241,7 @@ export function __createReactiveCache__<T>(
     }
   }
 
-  function getValue(): T {
+  const getValue = (): T => {
     if(state$.getValue() !== EMPTY_SYMBOL) {
       return state$.getValue() as T
     }
@@ -300,18 +249,96 @@ export function __createReactiveCache__<T>(
     return params?.defaultValue as T
   }
 
-  function requestUpdateFromObservable(updateRecourse: Observable<T>): Observable<T> {
+  const patchState = () => {
+    if(patchedState !== null) {
+      void Promise.resolve(() => {
+        state$.next(patchedState!);
+        patchedState = null
+      })
+    }
+  }
+
+  const requestUpdateFromObservable = (updateRecourse: Observable<T>): Observable<T> => {
     return updateRecourse.pipe(
-      tap({
-        next: (value) => {
-          next(value);
-          _updateProceeding = false;
-        },
-        error: () => {
-          _updateProceeding = false
-        },
-      }),
-      switchMap(() => nonEmptyStateRef$)
+        tap({
+          next: (value) => {
+            next(value);
+            _updateProceeding = false;
+          },
+          error: () => {
+            _updateProceeding = false
+          },
+        }),
+        switchMap(() => nonEmptyStateRef$)
     );
+  }
+
+  if(params?.constant) {
+    return {
+      name, state$,
+      nil,
+      rc: Object.assign(getConstantObservable(), {
+        getObservable: getConstantObservable,
+        isReactiveCacheObservable,
+      })
+    }
+  }
+
+  if(params?.allowManualUpdate === false) {
+    if(params?.valueReachable) {
+      return {
+        name, state$,
+        nil,
+        rc: Object.assign(getObservable(), {
+          getObservable,
+          update,
+          complete,
+          resetState,
+          getValue,
+          isReactiveCacheObservable,
+        })
+      }
+    } else {
+      return {
+        name, state$,
+        nil,
+        rc: Object.assign(getObservable(), {
+          getObservable,
+          update,
+          complete,
+          resetState,
+          isReactiveCacheObservable,
+        })
+      }
+    }
+  }
+
+  if(params?.valueReachable) {
+    return {
+      name, state$,
+      nil,
+      rc: Object.assign(getObservable(), {
+        getObservable,
+        next,
+        resetState,
+        update,
+        complete,
+        getValue,
+        isReactiveCacheObservable,
+      })
+    };
+  } else {
+    return {
+      name, state$,
+      nil,
+      rc: Object.assign(getObservable(), {
+        getObservable,
+        next,
+        resetState,
+        update,
+        complete,
+        isReactiveCacheObservable,
+      })
+    }
   }
 }

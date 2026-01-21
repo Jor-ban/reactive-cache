@@ -1,12 +1,12 @@
 import { BehaviorSubject, Observable } from "rxjs";
 
 import { NamedBehaviorSubject } from "./named-behavior-subject";
-import {ConstantReactiveCacheObservable} from "../src";
 
-export interface ReactiveCacheObservableParameters<T> {
+export interface ReactiveCacheObservableParameters<T, Nil = typeof EMPTY_SYMBOL> {
   allowManualUpdate?: boolean
   valueReachable?: boolean
-  onNext?: (v: T | typeof EMPTY_SYMBOL) => void
+  nil?: Nil
+  onNext?: (v: T | Nil) => void
 }
 
 export interface ReactiveCacheObservable<T> extends Observable<T> {

@@ -5,37 +5,39 @@ export const __REACTIVE_CACHES_LIST__ = [];
 export const __REACTIVE_CACHES_ON_UPDATE_MAP__ = new WeakMap();
 export const __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__ = new BehaviorSubject(undefined);
 export const EMPTY_SYMBOL = Symbol("[UPDATABLE CACHE] EMPTY");
-let WINDOW;
+let WINDOW = null;
 try {
     WINDOW = window || this;
 }
 catch (_ignored) { }
 if (WINDOW && typeof WINDOW === 'object') {
-    WINDOW[__REACTIVE_CACHE_WINDOW_PROP_NAME__] = {};
+    if (!WINDOW[__REACTIVE_CACHE_WINDOW_PROP_NAME__]) {
+        WINDOW[__REACTIVE_CACHE_WINDOW_PROP_NAME__] = {};
+    }
     WINDOW[__REACTIVE_CACHE_WINDOW_PROP_NAME__]['__REACTIVE_CACHES_LIST__'] = __REACTIVE_CACHES_LIST__;
     WINDOW[__REACTIVE_CACHE_WINDOW_PROP_NAME__]['__REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__'] = __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__;
     WINDOW[__REACTIVE_CACHE_WINDOW_PROP_NAME__]['EMPTY_SYMBOL'] = EMPTY_SYMBOL;
 }
-export function reactiveCache(name, updateRecourse$, params) {
+export const reactiveCache = (name, updateRecourse$, params) => {
     return createRCWithTracking(updateRecourse$, Object.assign({ name }, params));
-}
-reactiveCache.readonly = function (name, updateRecourse$, params) {
+};
+reactiveCache.readonly = (name, updateRecourse$, params) => {
     return createRCWithTracking(updateRecourse$, Object.assign({ name, allowManualUpdate: false }, params));
 };
-reactiveCache.valueReadable = function (name, updateRecourse$, defaultValue, params) {
+reactiveCache.valueReadable = (name, updateRecourse$, defaultValue, params) => {
     return createRCWithTracking(updateRecourse$, Object.assign({ name, defaultValue, valueReachable: true }, params));
 };
-reactiveCache.anonymous = function (updateRecourse$, params) {
+reactiveCache.anonymous = (updateRecourse$, params) => {
     return createRCWithTracking(updateRecourse$, params);
 };
-reactiveCache.constant = function (name, updateRecourse$) {
+reactiveCache.constant = (name, updateRecourse$) => {
     return createRCWithTracking(updateRecourse$, { name, constant: true });
 };
-function createRCWithTracking(updateRecourse$, params) {
-    const { rc, state$ } = __createReactiveCache__(updateRecourse$, params, (data) => {
+const createRCWithTracking = (updateRecourse$, params) => {
+    const { rc, state$, nil } = __createReactiveCache__(updateRecourse$, params, (data) => {
         var _a;
         if (!__REACTIVE_CACHES_ON_UPDATE_MAP__.has(state$)) {
-            __REACTIVE_CACHES_ON_UPDATE_MAP__.set(state$, new BehaviorSubject(EMPTY_SYMBOL));
+            __REACTIVE_CACHES_ON_UPDATE_MAP__.set(state$, new BehaviorSubject(nil));
         }
         (_a = __REACTIVE_CACHES_ON_UPDATE_MAP__.get(state$)) === null || _a === void 0 ? void 0 : _a.next(data);
     }, () => {
@@ -46,97 +48,46 @@ function createRCWithTracking(updateRecourse$, params) {
         __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__.next();
     });
     if (!__REACTIVE_CACHES_ON_UPDATE_MAP__.has(state$)) {
-        __REACTIVE_CACHES_ON_UPDATE_MAP__.set(state$, new BehaviorSubject(EMPTY_SYMBOL));
+        __REACTIVE_CACHES_ON_UPDATE_MAP__.set(state$, new BehaviorSubject(nil));
     }
     __REACTIVE_CACHES_LIST__.push(state$);
     __REACTIVE_CACHES_LIST_UPDATE_OBSERVABLE__.next();
     return rc;
-}
-export function __createReactiveCache__(updateRecourse$, params, onData, onComplete) {
+};
+export const __createReactiveCache__ = (updateRecourse$, params, onData, onComplete) => {
     var _a;
     let name = (_a = params === null || params === void 0 ? void 0 : params.name) !== null && _a !== void 0 ? _a : '[UNNAMED]';
-    const state$ = new NamedBehaviorSubject(EMPTY_SYMBOL, name);
+    let patchedState = null;
+    let nil = (params && 'nil' in params ? params.nil : EMPTY_SYMBOL);
+    const state$ = new NamedBehaviorSubject(nil, name);
     const isReactiveCacheObservable = true;
-    let _updateProceeding = false;
-    const nonEmptyStateRef$ = state$.pipe(filter((value) => value !== EMPTY_SYMBOL));
-    if (params === null || params === void 0 ? void 0 : params.constant) {
-        return {
-            name, state$,
-            rc: Object.assign(getConstantObservable(), {
-                getObservable: getConstantObservable,
-                isReactiveCacheObservable,
-            })
-        };
-    }
-    if ((params === null || params === void 0 ? void 0 : params.allowManualUpdate) === false) {
-        if (params === null || params === void 0 ? void 0 : params.valueReachable) {
-            return {
-                name, state$,
-                rc: Object.assign(getObservable(), {
-                    getObservable,
-                    update,
-                    complete,
-                    resetState,
-                    getValue,
-                    isReactiveCacheObservable,
-                })
-            };
-        }
-        else {
-            return {
-                name, state$,
-                rc: Object.assign(getObservable(), {
-                    getObservable,
-                    update,
-                    complete,
-                    resetState,
-                    isReactiveCacheObservable,
-                })
-            };
-        }
-    }
-    if (params === null || params === void 0 ? void 0 : params.valueReachable) {
-        return {
-            name, state$,
-            rc: Object.assign(getObservable(), {
-                getObservable,
-                next,
-                resetState,
-                update,
-                complete,
-                getValue,
-                isReactiveCacheObservable,
-            })
-        };
+    if (params) {
+        params.onNext = params.onNext || (() => {
+            patchState();
+        });
     }
     else {
-        return {
-            name, state$,
-            rc: Object.assign(getObservable(), {
-                getObservable,
-                next,
-                resetState,
-                update,
-                complete,
-                isReactiveCacheObservable,
-            })
+        params = {
+            onNext: () => {
+                patchState();
+            }
         };
     }
-    function getObservable() {
-        return state$.pipe(exhaustMap((value) => {
-            if (_updateProceeding || value !== EMPTY_SYMBOL) {
-                return state$.pipe(filter(v => v !== EMPTY_SYMBOL));
-            }
-            else {
-                return update();
-            }
-        }));
-    }
-    function getConstantObservable() {
+    let _updateProceeding = false;
+    const nonEmptyStateRef$ = state$.pipe(filter((value) => value !== nil));
+    const getObservable = () => state$.pipe(exhaustMap((value) => {
+        if (_updateProceeding || value !== nil) {
+            return state$.pipe(filter(v => v !== nil));
+        }
+        else {
+            return update();
+        }
+    }));
+    const getConstantObservable = () => {
         const obs = getObservable();
         let subscription;
         return defer(() => {
-            if (!subscription && state$.value === EMPTY_SYMBOL) {
+            if (!subscription && state$.value === nil) {
                 subscription = obs.subscribe();
             }
             return obs.pipe(tap({
@@ -146,24 +97,24 @@ export function __createReactiveCache__(updateRecourse$, params, onData, onCompl
                 }
             }));
         });
-    }
-    function next(newState) {
+    };
+    const next = (newState) => {
         var _a;
         state$.next(newState);
         (_a = params === null || params === void 0 ? void 0 : params.onNext) === null || _a === void 0 ? void 0 : _a.call(params, newState);
         onData === null || onData === void 0 ? void 0 : onData(newState);
-    }
-    function resetState() {
+    };
+    const resetState = () => {
         var _a;
-        state$.next(EMPTY_SYMBOL);
-        (_a = params === null || params === void 0 ? void 0 : params.onNext) === null || _a === void 0 ? void 0 : _a.call(params, EMPTY_SYMBOL);
-        onData === null || onData === void 0 ? void 0 : onData(EMPTY_SYMBOL);
-    }
-    function complete() {
+        state$.next(nil);
+        (_a = params === null || params === void 0 ? void 0 : params.onNext) === null || _a === void 0 ? void 0 : _a.call(params, nil);
+        onData === null || onData === void 0 ? void 0 : onData(nil);
+    };
+    const complete = () => {
         onComplete === null || onComplete === void 0 ? void 0 : onComplete();
         state$.complete();
-    }
-    function update() {
+    };
+    const update = () => {
         if (updateRecourse$ instanceof Observable) {
             _updateProceeding = true;
             return requestUpdateFromObservable(updateRecourse$);
@@ -190,14 +141,22 @@ export function __createReactiveCache__(updateRecourse$, params, onData, onCompl
             onData === null || onData === void 0 ? void 0 : onData(updateRecourse$);
             return nonEmptyStateRef$;
         }
-    }
-    function getValue() {
+    };
+    const getValue = () => {
         if (state$.getValue() !== EMPTY_SYMBOL) {
             return state$.getValue();
         }
         return params === null || params === void 0 ? void 0 : params.defaultValue;
-    }
-    function requestUpdateFromObservable(updateRecourse) {
+    };
+    const patchState = () => {
+        if (patchedState !== null) {
+            void Promise.resolve(() => {
+                state$.next(patchedState);
+                patchedState = null;
+            });
+        }
+    };
+    const requestUpdateFromObservable = (updateRecourse) => {
         return updateRecourse.pipe(tap({
             next: (value) => {
                 next(value);
@@ -207,5 +166,73 @@ export function __createReactiveCache__(updateRecourse$, params, onData, onCompl
                 _updateProceeding = false;
             },
         }), switchMap(() => nonEmptyStateRef$));
+    };
+    if (params === null || params === void 0 ? void 0 : params.constant) {
+        return {
+            name, state$,
+            nil,
+            rc: Object.assign(getConstantObservable(), {
+                getObservable: getConstantObservable,
+                isReactiveCacheObservable,
+            })
+        };
     }
-}
+    if ((params === null || params === void 0 ? void 0 : params.allowManualUpdate) === false) {
+        if (params === null || params === void 0 ? void 0 : params.valueReachable) {
+            return {
+                name, state$,
+                nil,
+                rc: Object.assign(getObservable(), {
+                    getObservable,
+                    update,
+                    complete,
+                    resetState,
+                    getValue,
+                    isReactiveCacheObservable,
+                })
+            };
+        }
+        else {
+            return {
+                name, state$,
+                nil,
+                rc: Object.assign(getObservable(), {
+                    getObservable,
+                    update,
+                    complete,
+                    resetState,
+                    isReactiveCacheObservable,
+                })
+            };
+        }
+    }
+    if (params === null || params === void 0 ? void 0 : params.valueReachable) {
+        return {
+            name, state$,
+            nil,
+            rc: Object.assign(getObservable(), {
+                getObservable,
+                next,
+                resetState,
+                update,
+                complete,
+                getValue,
+                isReactiveCacheObservable,
+            })
+        };
+    }
+    else {
+        return {
+            name, state$,
+            nil,
+            rc: Object.assign(getObservable(), {
+                getObservable,
+                next,
+                resetState,
+                update,
+                complete,
+                isReactiveCacheObservable,
+            })
+        };
+    }
+};
