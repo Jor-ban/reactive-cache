@@ -77,4 +77,4 @@ Todo id: 1
 ---[ as you can see subscribers get update instantly ]---
 ```
 
-[![Edit reactive-cache-example](https://codesandbox.io/static/img/play-codesandbox.svg)](https://codesandbox.io/p/sandbox/green-snow-yst6xw)
+[![Edit reactive-cache-example](https://codesandbox.io/static/img/play-codesandbox.svg)](https://yst6xw.csb.app/)
