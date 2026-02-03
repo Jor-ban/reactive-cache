@@ -4,6 +4,23 @@
     <img src="https://img.shields.io/badge/npm-CB3837?style=for-the-badge&logo=npm&logoColor=white" />
 </a>
 
+## Core Idea
+
+  You give it a data source, it returns an Observable-like object that:
+  - Lazily fetches data only when subscribed to
+  - Caches the result to prevent redundant calls
+  - Allows manual updates (next(), update(), resetState())
+  - Provides synchronous access to the current value (in certain variants)
+
+## Cache Variants
+| Factory   |      Description      |
+|----------|:-------------:|
+| reactiveCache()   |   Full-featured cache with manual updates |
+| reactiveCache.readonly() |    Immutable — no manual state changes   |
+| reactiveCache.valueReadable()  | Adds synchronous getValue() access |
+| reactiveCache.anonymous()  | Unnamed (no global tracking) |
+| reactiveCache.constant()  | Emits once, ignores subsequent parent updates |
+
 ## Installation
 
 ```bash
