@@ -1,6 +1,6 @@
 import {reactiveCache} from './index';
-import axios from 'axios';
-import { find, map } from "rxjs";
+import { first, map } from "rxjs";
+import { ajax } from "rxjs/ajax";
 
 type Todo = {
   userId: number;
@@ -9,15 +9,42 @@ type Todo = {
   completed: boolean;
 };
 
-const cachedObservable = reactiveCache<Todo>(
+const cachedTodo = reactiveCache<Todo>(
   "cachedObservable",
-  axios.get<Todo>("https://jsonplaceholder.typicode.com/todos/1").then((response) => response.data)
+  ajax<Todo>("https://jsonplaceholder.typicode.com/todos/1").pipe(
+    map((respWithMetadata) => respWithMetadata.response)
+  )
 );
 
-cachedObservable
+// even tho the observable has many subscriptions, the request has not made again
+cachedTodo
   .pipe(map((todo: Todo) => "Author id is: " + todo.userId))
   .subscribe(console.log);
 
-cachedObservable
-  .pipe(map((todo: Todo) => "Title is: " + todo.title))
+cachedTodo.pipe(map((todo: Todo) => "Title is: " + todo.userId)).subscribe(console.log);
+
+cachedTodo
+  .pipe(map((todo: Todo) => (todo.completed ? "Completed" : "Not completed")))
   .subscribe(console.log);
+
+setTimeout(() => {
+  // the state just being droped and empty until a new subscription is emited
+  cachedTodo.resetState();
+  console.log("----------[ here the state resets ]-------------");
+}, 5_000);
+
+setTimeout(() => {
+  // a new subscription has been emited, and all old subscribers instantly get new data
+  cachedTodo.pipe(map((todo: Todo) => "Todo id: " + todo.id)).subscribe(console.log);
+}, 7_000);
+
+setTimeout(() => {
+  console.log("-----------[ calling update ]------------");
+  // now lets try to make it update itself without reseting
+  cachedTodo
+    .update()
+    .pipe(first())
+    .subscribe(() => {
+      console.log("---[ as you can see subscribers get update instantly ]---");
+    });
+}, 10_000);

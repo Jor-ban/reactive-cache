@@ -5,7 +5,8 @@
   "scripts": {
     "test": "npx tsc && tsx watch src/test.ts && echo 'all tests are complete!'",
     "manual-test": "npx tsc && tsx watch src/manualTest.ts",
-    "prepare": "npx tsc && rm -f ./dist/test.js"
+    "prepare": "npx tsc && rm -f ./dist/test.js",
+    "serve": "npx serve ."
   },
   "devDependencies": {
     "@reactive-cache/core": "^0.1.4",

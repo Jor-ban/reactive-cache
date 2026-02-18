@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reactive Cache Example</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "rxjs": "https://esm.sh/rxjs",
+        "rxjs/operators": "https://esm.sh/rxjs/operators",
+        "rxjs/ajax": "https://esm.sh/rxjs/ajax"
+      }
+    }
+  </script>
+</head>
+<body>
+  <script type="module">
+    import { first, map } from "rxjs/operators";
+    import { ajax } from "rxjs/ajax";
+    import { reactiveCache } from './dist/index.js';
+
+    const cachedTodo = reactiveCache(
+      "cachedObservable",
+      ajax("https://jsonplaceholder.typicode.com/todos/1").pipe(
+        map((respWithMetadata) => respWithMetadata.response)
+      )
+    );
+
+    // even tho the observable has many subscriptions, the request has not made again
+    cachedTodo
+      .pipe(map((todo) => "Author id is: " + todo.userId))
+      .subscribe(console.log);
+
+    cachedTodo.pipe(map((todo) => "Title is: " + todo.userId)).subscribe(console.log);
+
+    cachedTodo
+      .pipe(map((todo) => (todo.completed ? "Completed" : "Not completed")))
+      .subscribe(console.log);
+
+    setTimeout(() => {
+      // the state just being droped and empty until a new subscription is emited
+      cachedTodo.resetState();
+      console.log("----------[ here the state resets ]-------------");
+    }, 5_000);
+
+    setTimeout(() => {
+      // a new subscription has been emited, and all old subscribers instantly get new data
+      cachedTodo.pipe(map((todo) => "Todo id: " + todo.id)).subscribe(console.log);
+    }, 7_000);
+
+    setTimeout(() => {
+      console.log("-----------[ calling update ]------------");
+      // now lets try to make it update itself without reseting
+      cachedTodo
+        .update()
+        .pipe(first())
+        .subscribe(() => {
+          console.log("---[ as you can see subscribers get update instantly ]---");
+        });
+    }, 10_000);
+  </script>
+</body>
+</html>

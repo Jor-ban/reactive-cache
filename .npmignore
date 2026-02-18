@@ -12,3 +12,4 @@ dist/manualTest.js
 package-lock.json
 tsconfig.json
 .npmignore
+index.html
