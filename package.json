@@ -1,6 +1,6 @@
 {
   "name": "@reactive-cache/core",
-  "version": "3.2.0",
+  "version": "3.2.2",
   "type": "module",
   "scripts": {
     "test": "npx tsc && tsx watch src/test.ts && echo 'all tests are complete!'",

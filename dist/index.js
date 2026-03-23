@@ -1,11 +1,5 @@
 import { BehaviorSubject, defer, exhaustMap, filter, from, Observable, switchMap, tap } from "rxjs";
-export class NamedBehaviorSubject extends BehaviorSubject {
-    constructor(initialValue, name) {
-        super(initialValue);
-        this.name = name;
-    }
-}
-
+import { NamedBehaviorSubject } from "./named-behavior-subject.js";
 export const __REACTIVE_CACHE_WINDOW_PROP_NAME__ = '__REACTIVE_CACHE_DATA__';
 export const __REACTIVE_CACHES_LIST__ = [];
 export const __REACTIVE_CACHES_ON_UPDATE_MAP__ = new WeakMap();

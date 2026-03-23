@@ -1,5 +1,5 @@
 import {BehaviorSubject, defer, exhaustMap, filter, from, Observable, Subscription, switchMap, tap} from "rxjs";
-import {NamedBehaviorSubject} from "./named-behavior-subject";
+import {NamedBehaviorSubject} from "./named-behavior-subject.js";
 
 export interface ReactiveCacheObservable<T> extends Observable<T> {
   getObservable: () => Observable<T>
